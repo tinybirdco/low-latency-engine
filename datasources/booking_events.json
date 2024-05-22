@@ -1,0 +1,257 @@
+{
+    "event_time": {
+      "type": "mockingbird.timestampNow"
+    },
+    "event_id": {
+      "type": "string.uuid"
+    },
+    "event_type": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            "booking",
+            "search",
+            "cancellation",
+            "refund"
+          ],
+          "weights": [
+            25,
+            60,
+            10,
+            5
+          ]
+        }
+      ]
+    },
+    "device": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            "desktop",
+            "mobile",
+            "tablet",
+            "smart_tv",
+            "smartwatch"
+          ],
+          "weights": [
+            30,
+            55,
+            5,
+            5,
+            5
+          ]
+        }
+      ]
+    },
+    "browser": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            "Chrome",
+            "Brave",
+            "Firefox",
+            "Safari"
+          ],
+          "weights": [
+            65,
+            5,
+            10,
+            20
+          ]
+        }
+      ]
+    },
+    "os": {
+      "type": "mockingbird.osName"
+    },
+    "product_id": {
+      "type": "number.int",
+      "params": [
+        {
+          "min": 3278123,
+          "max": 3378123
+        }
+      ]
+    },
+    "user_id": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            123456,
+            234567,
+            345678,
+            456789,
+            567890,
+            678901,
+            789012,
+            890123,
+            901234
+          ],
+          "weights": [
+            10,
+            10,
+            10,
+            10,
+            10,
+            10,
+            10,
+            10,
+            10
+          ]
+        }
+      ]
+    },
+    "user_location": {
+      "type": "location.country"
+    },
+    "booking_country": {
+      "type": "location.country"
+    },
+    "booking_city": {
+      "type": "location.cityName"
+    },
+    "start_datetime": {
+      "type": "mockingbird.datetimeNow"
+    },
+    "end_datetime": {
+      "type": "mockingbird.datetimeBetween",
+      "params": [
+        {
+          "start": "2024-06-01T00:00:00.000Z", 
+          "end": "2025-01-01T00:00:00.000Z"
+        }
+      ]
+    },
+    "price": {
+      "type": "number.int",
+      "params": [
+        {
+          "min": 20,
+          "max": 1000
+        }
+      ]
+    },
+    "currency": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            "USD",
+            "EUR",
+            "GBP",
+            "JPY",
+            "CNY"
+          ],
+          "weights": [
+            40,
+            30,
+            10,
+            10,
+            10
+          ]
+        }
+      ]
+    },
+    "property_type": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            "hotel",
+            "apartment",
+            "villa",
+            "hostel",
+            "resort",
+            "room"
+          ],
+          "weights": [
+            40,
+            30,
+            5,
+            10,
+            10,
+            5
+          ]
+        }
+      ]
+    },
+    "are_pets_allowed": {
+      "type": "number.int",
+      "params": [
+        {
+          "min": 0,
+          "max": 1
+        }
+      ]
+    },
+    "has_wifi": {
+      "type": "number.int",
+      "params": [
+        {
+          "min": 0,
+          "max": 1
+        }
+      ]
+    },
+    "has_parking": {
+      "type": "number.int",
+      "params": [
+        {
+          "min": 0,
+          "max": 1
+        }
+      ]
+    },
+    "card_id": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            123456,
+            234567,
+            345678,
+            456789,
+            567890,
+            678901,
+            789012,
+            890123,
+            901234
+          ],
+          "weights": [
+            10,
+            10,
+            10,
+            10,
+            10,
+            10,
+            10,
+            10,
+            10
+          ]
+        }
+      ]
+    },
+    "card_issuer": {
+      "type": "mockingbird.pickWeighted",
+      "params": [
+        {
+          "values": [
+            "Visa",
+            "Mastercard",
+            "American Express",
+            "Discover"
+          ],
+          "weights": [
+            40,
+            30,
+            20,
+            10
+          ]
+        }
+      ]
+    }
+  }
