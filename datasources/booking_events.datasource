@@ -1,0 +1,27 @@
+
+SCHEMA >
+    `are_pets_allowed` Int16 `json:$.are_pets_allowed`,
+    `booking_city` String `json:$.booking_city`,
+    `booking_country` String `json:$.booking_country`,
+    `browser` String `json:$.browser`,
+    `card_id` Int32 `json:$.card_id`,
+    `card_issuer` String `json:$.card_issuer`,
+    `currency` String `json:$.currency`,
+    `device` String `json:$.device`,
+    `end_datetime` DateTime `json:$.end_datetime`,
+    `event_id` String `json:$.event_id`,
+    `event_time` String `json:$.event_time`,
+    `event_type` String `json:$.event_type`,
+    `has_parking` Int16 `json:$.has_parking`,
+    `has_wifi` Int16 `json:$.has_wifi`,
+    `os` String `json:$.os`,
+    `price` Int32 `json:$.price`,
+    `product_id` Int32 `json:$.product_id`,
+    `property_type` String `json:$.property_type`,
+    `start_datetime` DateTime `json:$.start_datetime`,
+    `user_id` Int32 `json:$.user_id`,
+    `user_location` String `json:$.user_location`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYear(end_datetime)"
+ENGINE_SORTING_KEY "end_datetime, property_type, user_id, user_location"

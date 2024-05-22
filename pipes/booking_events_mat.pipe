@@ -1,0 +1,26 @@
+NODE data_preparation
+SQL >
+
+    SELECT 
+      are_pets_allowed, 
+      toLowCardinality(booking_city) as booking_city, 
+      toLowCardinality(booking_country) as booking_country, 
+      toLowCardinality(browser) as browser, 
+      card_id, 
+      toLowCardinality(card_issuer) as card_issuer, 
+      toLowCardinality(device) as device, 
+      toStartOfDay(end_datetime) as end_date,  
+      event_time, 
+      toLowCardinality(event_type) as event_type, 
+      has_parking, 
+      has_wifi, 
+      toLowCardinality(os) as os, 
+      multiIf(currency = 'EUR', price*1.08, currency = 'GBP', price*1.27, currency = 'JPY', price*0.00064, currency = 'CNY', price*0.14, price*1.00) as price_in_usd,
+      toLowCardinality(property_type) as property_type, 
+      toStartOfDay(start_datetime) as start_date, 
+      user_id, 
+      toLowCardinality(user_location) as user_location,
+      date_diff(DAY, start_date, end_date) as booking_duration
+    FROM booking_events
+
+
