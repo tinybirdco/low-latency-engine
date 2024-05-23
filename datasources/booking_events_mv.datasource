@@ -1,0 +1,27 @@
+
+SCHEMA >
+    `are_pets_allowed` Int16,
+    `booking_city` LowCardinality(String),
+    `booking_country` LowCardinality(String),
+    `browser` LowCardinality(String),
+    `card_id` Int32,
+    `card_issuer` LowCardinality(String),
+    `device` LowCardinality(String),
+    `end_date` DateTime,
+    `event_time` DateTime,
+    `event_type` LowCardinality(String),
+    `has_parking` Int16,
+    `has_wifi` Int16,
+    `os` LowCardinality(String),
+    `price_in_usd` Float64,
+    `property_type` LowCardinality(String),
+    `start_date` DateTime,
+    `user_id` Int32,
+    `user_location` LowCardinality(String),
+    `booking_duration` Int64
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toHour(event_time)"
+ENGINE_SORTING_KEY "event_type, event_time"
+ENGINE_SETTINGS "index_granularity = 1024"
+ENGINE_TTL "event_time + toIntervalDay(1)"

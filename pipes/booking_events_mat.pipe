@@ -23,4 +23,7 @@ SQL >
       date_diff(DAY, start_date, end_date) as booking_duration
     FROM booking_events
 
+TYPE materialized
+DATASOURCE booking_events_mv
+
 

@@ -2,26 +2,36 @@
 
 The Low Latency Engine (LLE) is a guide to help you build a real-time data processing pipeline using Tinybird. The guide is divided into three main sections:
 
-* The first section is focused on the problem statement and use cases.
+* The first section is focused on the problem statement.
 * The second section is focused on the data model.
 * The third section is focused on the queries/endpoints.
 
-## 1. Problem Statement and Use Cases
+## 1. Problem Statement
 
 ### Problem Statement
 
-You are working for a hotel booking platform and you have been tasked with building a real-time data processing pipeline on top of [Tinybird](https://www.tinybird.co/) to detect long term discounts and potential fraudsters. The data is being ingested [using Tinybird's Events API](https://www.tinybird.co/docs/guides/ingest/ingest-from-the-events-api). The data source contains information about hotel booking events, such as the event type (e.g., search, booking, cancellation), the device used for the event (e.g., mobile, desktop), the browser used during the event, the operating system used during the event, the user involved in the event, the location of the user at the time of the event, the country of the booking, the check-in and check-out dates for the booking, the price of the booking, the currency used for the booking, the type of property (e.g., hotel, apartment), whether pets are allowed, whether the property has Wi-Fi, whether the property has parking, the card used for the booking, the issuer of the card used, whether the booking is confirmed, and whether the booking was cancelled. 
+You are working for a hotel booking platform and you have been tasked with building a real-time data processing pipeline to detect long term discounts and at the same potential fraudsters. The platform generates many events such as searches and bookings per second, and you need to process these events and get a response in real time (less than a second). In doing so, you will be able to offer appropiate discounts to users who are likely to book a property for an extended period of time, and flag potential fraudsters in real-time. 
+
+### Technical Challenges and potential solutions using Tinybird
+
+Low latency use cases could be challenging because it entails two main problems: 
+
+* processing the data in real-time, and
+* providing a response in real-time.
+
+The first problem consists of processing the data as soon as it arrives. ClickHouse is really good at ingesting data and transforming it at the same time. [It achieves this thanks to materialized views](https://www.tinybird.co/docs/guides/publish/master-materialized-views), which are precomputed tables that are updated in real-time as new data arrives. 
+
+The second problem consists of providing a response in real-time. Tinybird endpoints will make it possible to query the data in real-time but we would need to structure the data based on the queries we want to run. Each of [our use cases will tell us how to order and configure our engine to provide the best possible response time](https://www.tinybird.co/blog-posts/thinking-in-tinybird). The toolkit that we would use would be adjusting our data types, sorting keys, partitioning and index granularity.
 
 ### Use cases
 
 #### Long term discounts
 
-Your platform wants to offer long term visit discounts to users who are likely to book a property for an extended period of time. So if an user fulfills at least 5 of the following conditions, he or she will be eligible for a long term discount:
+Your platform wants to offer long term visit discounts to users who are likely to book a property for an extended period of time. So if an user that is searching for a booking fulfills at least 5 of the following conditions, he or she will be eligible for a long term discount:
 
-* the `event_type` is `search`
 * 3 events of the same `user_id` in less than an hour
 * the duration of the booking search (`end_date` - `start_date`) more than 2 weeks
-* the `price` is more than 1000
+* the `price` is more than 300
 * country in `['FR', 'PT', 'IT', 'ES']`
 * `property_type` in `['house', 'apartment']`
 * `has_wifi` is True
@@ -47,6 +57,10 @@ In addition, the query time should be less than 500 ms. The user should be flagg
 
 ## 2. Data Model
 
+### Ingestion
+
+As stated above, in our booking platform we are generating many events per second. In real life, these events could being captured using Kafka or Tinybird's events API. We could mock the ingestion using Tinybird's Events API with [Mockingbird](https://mockingbird.tinybird.co/) based on [this json schema](/datasources/booking_events.json). 
+
 ### Data Source
 
 * `event_id` (Int32): Unique identifier for each event.
@@ -71,10 +85,6 @@ In addition, the query time should be less than 500 ms. The user should be flagg
 * `card_id` (Int32): Identifier for the card used for booking.
 * `card_issuer` (String): Issuer of the card used.
 
-### Ingestion
-
-The data is being ingested using Tinybird's Events API using [Mockingbird](https://mockingbird.tinybird.co/) based on [json this schema](/datasources/booking_events.json). In this case, we are generating 5 events per second.
-
 ### Materialized Views
 
 #### Data Preparation
@@ -86,6 +96,23 @@ There are some data preparation steps that will be common to both use cases:
 * normalizing prices using just one currencty (e.g., USD),
 * removing unnecessary columns (e.g., `event_id`, `product_id`, `currency`, etc.),
 * applying a type modifier such as low cardinality to strings with fewer categories (e.g. `event_type`, `device`, `browser`, etc.).
+
+#### Partitioning and index granularity
+
+* The data will be partitioned by `event_time` but reducing the partition size. Small partitions will be merged faster so queries will be faster. Notice that small partition sizes could break the ingestion due too many parts errors so we should be mindful of this issue and adjust the partition size accordingly. In this respect, we have chosen to partition by weeks, a good time range granularity balancing:
+
+```
+ENGINE_PARTITION_KEY "toDayOfWeek(event_time)"
+```
+
+* The data source will be indexed by `user_id` and `event_type`. But for each use case we will use other indexes to adjust to the particular filtering conditions.
+
+* Finally, we could tweak our index granularity to reduce the amount of data you read. [ClickHouse by default sets 8192 rows per each granule](https://clickhouse.com/docs/en/optimize/skipping-indexes), so we could have less number of rows (e.g. 2048). We would need to play with the size since a very small size impacts the inserts and other kind of queries (e.g. range). 
+
+```
+SETTINGS "index_granularity=2048"
+```
+
 
 #### Long term discounts
 

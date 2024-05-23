@@ -10,7 +10,7 @@ SCHEMA >
     `device` String `json:$.device`,
     `end_datetime` DateTime `json:$.end_datetime`,
     `event_id` String `json:$.event_id`,
-    `event_time` String `json:$.event_time`,
+    `event_time` DateTime `json:$.event_time`,
     `event_type` String `json:$.event_type`,
     `has_parking` Int16 `json:$.has_parking`,
     `has_wifi` Int16 `json:$.has_wifi`,
@@ -23,5 +23,5 @@ SCHEMA >
     `user_location` String `json:$.user_location`
 
 ENGINE "MergeTree"
-ENGINE_PARTITION_KEY "toYear(end_datetime)"
-ENGINE_SORTING_KEY "end_datetime, property_type, user_id, user_location"
+ENGINE_PARTITION_KEY "toHour(event_time)"
+ENGINE_SORTING_KEY "event_type, event_time"
