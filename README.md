@@ -113,10 +113,59 @@ ENGINE_PARTITION_KEY "toDayOfWeek(event_time)"
 SETTINGS "index_granularity=2048"
 ```
 
-
 #### Long term discounts
 
-TBD
+In order to precalculate the conditions for the long term discounts, we will create a materialized view that will filter the events that fulfill the conditions for the long term discounts:
+* first, we will prepare the conditions that need to be checked,
+* then, we will filter the users that fulfill at least 5 conditions,
+* finally, we will filter the users that have more than 3 searches.
+
+```sql
+NODE prepare_conditions_checked
+SQL >
+
+    SELECT 
+      user_id,
+      event_time,
+      if(booking_duration > 14, 1, 0) as is_duration_checked,
+      if(price_in_usd > 300, 1, 0) as is_price_checked,
+      if(booking_country in ('FR', 'PT', 'IT', 'ES'), 1, 0) as is_country_checked,
+      if(property_type in ('house', 'apartment'), 1, 0) as is_property_type_checked,
+      has_wifi as is_wifi_checked,
+      has_parking as is_parking_checked,
+      are_pets_allowed as is_pets_allowed_checked
+    FROM booking_events_mv
+    WHERE event_type = 'search'
+    AND event_time >= now() - INTERVAL 1 HOUR
+
+NODE get_users_fulfilling_5_conditions
+SQL >
+
+    WITH (is_duration_checked+is_price_checked+is_country_checked+is_property_type_checked+is_wifi_checked+is_parking_checked+is_pets_allowed_checked) as discount_index
+    SELECT 
+      user_id,
+      toStartOfHour(event_time) as hour,
+      count() as search_count
+    FROM prepare_conditions_checked
+    WHERE discount_index >= 5
+    GROUP BY user_id, hour
+
+NODE get_users_with_more_than_3_searches
+SQL >
+
+    SELECT DISTINCT
+        user_id,
+        hour
+    FROM get_users_fulfilling_5_conditions
+    WHERE search_count > 3
+    ORDER BY search_count DESC
+
+TYPE materialized
+DATASOURCE get_users_with_more_than_3_searches_mv
+
+```
+
+This materialized view is ready to be queried in real-time to offer the long term discount to the users that fulfill the conditions.
 
 #### Fraud detection
 
