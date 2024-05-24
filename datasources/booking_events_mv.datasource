@@ -1,3 +1,4 @@
+TOKEN "append_booking_events" APPEND
 
 SCHEMA >
     `are_pets_allowed` Int16,

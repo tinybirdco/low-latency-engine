@@ -1,10 +1,9 @@
 # Low Latency Engine
 
-The Low Latency Engine (LLE) is a guide to help you build a real-time data processing pipeline using Tinybird. The guide is divided into three main sections:
+The Low Latency Engine (LLE) is a guide to help you build a real-time data processing pipeline using Tinybird. The guide is divided into two main sections:
 
 * The first section is focused on the problem statement.
 * The second section is focused on the data model.
-* The third section is focused on the queries/endpoints.
 
 ## 1. Problem Statement
 
@@ -27,10 +26,9 @@ The second problem consists of providing a response in real-time. Tinybird endpo
 
 #### Long term discounts
 
-Your platform wants to offer long term visit discounts to users who are likely to book a property for an extended period of time. So if an user that is searching for a booking fulfills at least 5 of the following conditions, he or she will be eligible for a long term discount:
+Your platform wants to offer long term visit discounts to users who are likely to book a property for an extended period of time. So if an user that is searching for a booking at the same location fulfills at least 5 of the following conditions, he or she will be eligible for a long term discount:
 
-* 3 events of the same `user_id` in less than an hour
-* the duration of the booking search (`end_date` - `start_date`) more than 2 weeks
+* the duration of the booking search (`end_date` - `start_date`) more than 2 months
 * the `price` is more than 300
 * country in `['FR', 'PT', 'IT', 'ES']`
 * `property_type` in `['house', 'apartment']`
@@ -38,13 +36,12 @@ Your platform wants to offer long term visit discounts to users who are likely t
 * `has_parking` is True
 * `are_pets_allowed` is True
 
-In addition, the query time should be less than 700 ms. The discount should be offered to the user in real-time, before he or she completes the booking.
+In addition, the query time should be less than 700 ms. The discount should be offered to the user in real-time, before he or she completes the booking. Finally, the parameters in this query should be dynamic in part to allow our marketing team to adjust the conditions for the long term discounts.
 
 #### Fraud detection
 
-If an user fulfills at least 7 of the following conditions, he or she will be flagged as a potential fraudster:
+If an user performs 3 transactions in less than an hour (`event_type` is `booking`) and fulfills at least 3 of the following conditions, he or she will be flagged as a potential fraudster:
 
-* 3 transactions in less than an hour (`event_type` is `booking`)
 * each transaction `price` is more than 1000
 * the aggegated `price` of the 3 transactions is more than 5000
 * 3 different `device` in less than an hour
@@ -85,9 +82,7 @@ As stated above, in our booking platform we are generating many events per secon
 * `card_id` (Int32): Identifier for the card used for booking.
 * `card_issuer` (String): Issuer of the card used.
 
-### Materialized Views
-
-#### Data Preparation
+### Data Preparation
 
 There are some data preparation steps that will be common to both use cases:
 
@@ -97,80 +92,72 @@ There are some data preparation steps that will be common to both use cases:
 * removing unnecessary columns (e.g., `event_id`, `product_id`, `currency`, etc.),
 * applying a type modifier such as low cardinality to strings with fewer categories (e.g. `event_type`, `device`, `browser`, etc.).
 
-#### Partitioning and index granularity
+### Partitioning and index granularity
 
-* The data will be partitioned by `event_time` but reducing the partition size. Small partitions will be merged faster so queries will be faster. Notice that small partition sizes could break the ingestion due too many parts errors so we should be mindful of this issue and adjust the partition size accordingly. In this respect, we have chosen to partition by weeks, a good time range granularity balancing:
+* The data will be partitioned by `event_time` but reducing the partition size. Small partitions will be merged faster so queries will be faster. Notice that small partition sizes could break the ingestion due too many parts errors so we should be mindful of this issue and adjust the partition size accordingly. Partitioning keys can be set in [Tinybird's data source](https://www.tinybird.co/docs/version-control/datafiles#data-source) as follows:
 
 ```
-ENGINE_PARTITION_KEY "toDayOfWeek(event_time)"
+ENGINE_PARTITION_KEY "toHour(event_time)"
 ```
 
-* The data source will be indexed by `user_id` and `event_type`. But for each use case we will use other indexes to adjust to the particular filtering conditions.
+* The data source will be indexed by `user_id` and `event_type`. But for each use case we will use other indexes in every materialized view to adjust to the particular filtering conditions.
 
-* Finally, we could tweak our index granularity to reduce the amount of data you read. [ClickHouse by default sets 8192 rows per each granule](https://clickhouse.com/docs/en/optimize/skipping-indexes), so we could have less number of rows (e.g. 2048). We would need to play with the size since a very small size impacts the inserts and other kind of queries (e.g. range). 
+* Finally, we could tweak our index granularity to reduce the amount of data you read. [ClickHouse by default sets 8192 rows per each granule](https://clickhouse.com/docs/en/optimize/skipping-indexes), so we could have less number of rows (e.g. 2048). We would need to play with the size since a very small size impacts the inserts and other kind of queries (e.g. range). Index granularity could be set as follows in [Tinybird's data source](https://www.tinybird.co/docs/version-control/datafiles#data-source):
 
 ```
 SETTINGS "index_granularity=2048"
 ```
 
-#### Long term discounts
+### Long term discounts
 
 In order to precalculate the conditions for the long term discounts, we will create a materialized view that will filter the events that fulfill the conditions for the long term discounts:
-* first, we will prepare the conditions that need to be checked,
-* then, we will filter the users that fulfill at least 5 conditions,
-* finally, we will filter the users that have more than 3 searches.
+* first, we will prepare the conditions that need to be checked building a discount matrix,
+* then, we will filter the users that fulfill the discount value set by our analysts,
+* finally, we will get the unique customer ids to send them the discount.
 
 ```sql
-NODE prepare_conditions_checked
+TOKEN "long_term_discount_endpoint_read" READ
+
+NODE discount_matrix
 SQL >
 
+    %
     SELECT 
       user_id,
-      event_time,
-      if(booking_duration > 14, 1, 0) as is_duration_checked,
-      if(price_in_usd > 300, 1, 0) as is_price_checked,
-      if(booking_country in ('FR', 'PT', 'IT', 'ES'), 1, 0) as is_country_checked,
-      if(property_type in ('house', 'apartment'), 1, 0) as is_property_type_checked,
-      has_wifi as is_wifi_checked,
-      has_parking as is_parking_checked,
-      are_pets_allowed as is_pets_allowed_checked
-    FROM booking_events_mv
-    WHERE event_type = 'search'
-    AND event_time >= now() - INTERVAL 1 HOUR
+      if(booking_duration >= {{Int16(months, 2)}}*30, 1, 0) as duration_value,
+      if(price_in_usd > {{Int16(usd, 300)}}, 1, 0) as price_value,
+      if(booking_country in {{Array(countries, 'String', default='FR,PT')}}, 1, 0) as countries_value,
+      if(property_type in {{Array(countries, 'String', default='house,apartment')}}, 1, 0) as property_value,
+      if(has_wifi = {{Int16(wifi_flag, 1)}}, 1, 0) as wifi_value,
+      if(has_parking = {{Int16(parking_flag, 1)}}, 1, 0) as parking_value,
+      if(are_pets_allowed = {{Int16(pets_flag, 1)}}, 1, 0) as pets_value
+    FROM
+      booking_events_mv
+    WHERE
+      event_type = 'search'
+      and event_time >= toTimezone(now(), 'Europe/Berlin') - interval 10 second
 
-NODE get_users_fulfilling_5_conditions
+NODE filter_by_discount_index
 SQL >
 
-    WITH (is_duration_checked+is_price_checked+is_country_checked+is_property_type_checked+is_wifi_checked+is_parking_checked+is_pets_allowed_checked) as discount_index
-    SELECT 
+    %
+    WITH (
+      duration_value+price_value+countries_value+property_value+wifi_value+parking_value+pets_value
+    ) as discount_index
+    SELECT
       user_id,
-      toStartOfHour(event_time) as hour,
-      count() as search_count
-    FROM prepare_conditions_checked
-    WHERE discount_index >= 5
-    GROUP BY user_id, hour
+      discount_index
+    FROM discount_matrix
+    WHERE discount_index >= {{Int16(discount, 5)}}
+    ORDER BY discount_index DESC
 
-NODE get_users_with_more_than_3_searches
+NODE get_unique_customers
 SQL >
 
-    SELECT DISTINCT
-        user_id,
-        hour
-    FROM get_users_fulfilling_5_conditions
-    WHERE search_count > 3
-    ORDER BY search_count DESC
-
-TYPE materialized
-DATASOURCE get_users_with_more_than_3_searches_mv
-
+    SELECT DISTINCT user_id FROM filter_by_discount_index
 ```
 
-This materialized view is ready to be queried in real-time to offer the long term discount to the users that fulfill the conditions.
-
-#### Fraud detection
+### Fraud detection
 
 TBD
 
-## 3. Queries/Endpoints
-
-TBD
