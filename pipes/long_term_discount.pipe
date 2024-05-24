@@ -38,7 +38,7 @@ SQL >
 
 
 
-NODE get_unique_customers
+NODE get_potential_long_term_customers
 SQL >
 
     SELECT DISTINCT user_id FROM filter_by_discount_index

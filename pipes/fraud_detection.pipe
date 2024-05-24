@@ -1,0 +1,81 @@
+TOKEN "fraud_detection_endpoint_read" READ
+
+NODE booking_events_last_hour
+SQL >
+
+    SELECT
+        user_id,
+        event_time,
+        device,
+        browser,
+        os,
+        user_location,
+        card_id,
+        price_in_usd
+    FROM
+        booking_events_mv
+    WHERE
+        event_type = 'booking'
+    AND event_time > toTimezone(now(), 'Europe/Berlin') - INTERVAL 5 MINUTE
+
+
+
+NODE group_and_count_by_user
+SQL >
+
+    SELECT
+        user_id,
+        count() AS booking_count,
+        count(DISTINCT device) AS device_count,
+        count(DISTINCT browser) AS browser_count,
+        count(DISTINCT os) AS os_count,
+        count(DISTINCT user_location) AS user_location_count,
+        count(DISTINCT card_id) AS card_id_count,
+        sum(if(price_in_usd > 300, 1, 0)) AS high_price_count
+    FROM
+        booking_events_last_hour
+    GROUP BY
+        user_id
+    HAVING
+        booking_count >= 3
+
+
+
+NODE fraud_detection_matrix
+SQL >
+
+    SELECT
+        user_id,
+        if(device_count > 3, 1, 0) as device_value,
+        if(browser_count > 3, 1, 0) as browser_value,
+        if(os_count > 3, 1, 0) as os_value,
+        if(user_location_count > 3, 1, 0) as user_location_value,
+        if(card_id_count > 3, 1, 0) as card_id_value,
+        if(high_price_count > 3, 1, 0) as price_in_usd_value
+    FROM
+        group_and_count_by_user
+
+
+
+NODE filter_by_fraud_detection_index
+SQL >
+
+    %
+    WITH (
+      device_value+browser_value+os_value+user_location_value+card_id_value+price_in_usd_value
+    ) as fraud_detection_index
+    SELECT
+      user_id,
+      fraud_detection_index
+    FROM fraud_detection_matrix
+    WHERE fraud_detection_index >= 3
+    ORDER BY fraud_detection_index DESC
+
+
+
+NODE get_potential_fraudsters
+SQL >
+
+    SELECT DISTINCT user_id FROM filter_by_fraud_detection_index
+
+

@@ -40,10 +40,9 @@ In addition, the query time should be less than 700 ms. The discount should be o
 
 #### Fraud detection
 
-If an user performs 3 transactions in less than an hour (`event_type` is `booking`) and fulfills at least 3 of the following conditions, he or she will be flagged as a potential fraudster:
+If an user performs 3 transactions in less than 5 minutes (`event_type` is `booking`) and fulfills at least 3 of the following conditions, he or she will be flagged as a potential fraudster:
 
-* each transaction `price` is more than 1000
-* the aggegated `price` of the 3 transactions is more than 5000
+* each transaction `price` is more than 300
 * 3 different `device` in less than an hour
 * 3 different `browser` in less than an hour
 * 3 different os in less than an hour
@@ -157,7 +156,160 @@ SQL >
     SELECT DISTINCT user_id FROM filter_by_discount_index
 ```
 
+An example of an API endpoint call would be:
+
+```
+https://api.tinybird.co/v0/pipes/long_term_discount.json?discount=5&months=2&usd=300&countries=house%2Capartment&wifi_flag=1&parking_flag=1&pets_flag=1
+```
+
+And the results would be:
+
+```json
+{
+  "meta": [
+    {
+      "name": "user_id",
+      "type": "Int32"
+    }
+  ],
+  "data": [
+    {
+      "user_id": 189012
+    },
+    {
+      "user_id": 345678
+    },
+    {
+      "user_id": 201234
+    },
+    {
+      "user_id": 678901
+    }
+  ],
+  "rows": 4,
+  "statistics": {
+    "elapsed": 0.018713724,
+    "rows_read": 65,
+    "bytes_read": 2065
+  }
+}
+```
+
+18 ms! Not bad.
+
 ### Fraud detection
 
-TBD
+For the fraud detection use case, we will build a non dynamic endpoint that will filter the users that fulfill the conditions for the potential fraudsters:
+* first, we will group the events by user and count the number of events for each user,
+* then, we will build a fraud detection matrix with the conditions that need to be checked,
+* finally, we will filter the users that fulfill the fraud detection value set by our analysts.
 
+
+```sql
+TOKEN "fraud_detection_endpoint_read" READ
+
+NODE booking_events_last_hour
+SQL >
+
+    SELECT
+        user_id,
+        event_time,
+        device,
+        browser,
+        os,
+        user_location,
+        card_id,
+        price_in_usd
+    FROM
+        booking_events_mv
+    WHERE
+        event_type = 'booking'
+    AND event_time > toTimezone(now(), 'Europe/Berlin') - INTERVAL 5 MINUTE
+
+NODE group_and_count_by_user
+SQL >
+
+    SELECT
+        user_id,
+        count() AS booking_count,
+        count(DISTINCT device) AS device_count,
+        count(DISTINCT browser) AS browser_count,
+        count(DISTINCT os) AS os_count,
+        count(DISTINCT user_location) AS user_location_count,
+        count(DISTINCT card_id) AS card_id_count,
+        sum(if(price_in_usd > 300, 1, 0)) AS high_price_count
+    FROM
+        booking_events_last_hour
+    GROUP BY
+        user_id
+    HAVING
+        booking_count >= 5
+
+NODE fraud_detection_matrix
+SQL >
+
+    SELECT
+        user_id,
+        if(device_count > 3, 1, 0) as device_value,
+        if(browser_count > 3, 1, 0) as browser_value,
+        if(os_count > 3, 1, 0) as os_value,
+        if(user_location_count > 3, 1, 0) as user_location_value,
+        if(card_id_count > 3, 1, 0) as card_id_value,
+        if(high_price_count > 3, 1, 0) as price_in_usd_value
+    FROM
+        group_and_count_by_user
+
+NODE filter_by_fraud_detection_index
+SQL >
+
+    %
+    WITH (
+      device_value+browser_value+os_value+user_location_value+card_id_value+price_in_usd_value
+    ) as fraud_detection_index
+    SELECT
+      user_id,
+      fraud_detection_index
+    FROM fraud_detection_matrix
+    WHERE fraud_detection_index >= 3
+    ORDER BY fraud_detection_index DESC
+
+NODE get_potential_fraudsters
+SQL >
+
+    SELECT DISTINCT user_id FROM filter_by_fraud_detection_index
+```
+
+In this use case because the conditions are not dynamic, we could have built a materialized view to precalculate the fraud detection matrix and filter the users that fulfill the conditions for the potential fraudsters. 
+
+An example of an API endpoint call would be:
+
+```
+https://api.tinybird.co/v0/pipes/fraud_detection.json
+```
+
+And the results would be:
+
+```json
+{
+ "meta": [
+    {
+      "name": "user_id",
+      "type": "Int32"
+    }
+  ],
+  "data": [
+    {
+      "user_id": 234567
+    }
+  ],
+  "rows": 1,
+  "rows_before_limit_at_least": 1,
+  "statistics": {
+    "elapsed": 0.027963912,
+    "rows_read": 1035,
+    "bytes_read": 25875
+  }
+}
+```
+
+Same as the other use case, 28 ms! Not bad at all.
