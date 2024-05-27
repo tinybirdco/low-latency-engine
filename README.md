@@ -208,7 +208,7 @@ For the fraud detection use case, we will build a non dynamic endpoint that will
 ```sql
 TOKEN "fraud_detection_endpoint_read" READ
 
-NODE booking_events_last_hour
+NODE booking_events_last_5_minutes
 SQL >
 
     SELECT
@@ -239,7 +239,7 @@ SQL >
         count(DISTINCT card_id) AS card_id_count,
         sum(if(price_in_usd > 300, 1, 0)) AS high_price_count
     FROM
-        booking_events_last_hour
+        booking_events_last_5_minutes
     GROUP BY
         user_id
     HAVING
