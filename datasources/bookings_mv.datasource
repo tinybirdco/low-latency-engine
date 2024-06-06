@@ -1,0 +1,26 @@
+# Data Source created from Pipe 'bookings_enriched_mat'
+
+SCHEMA >
+    `are_pets_allowed` UInt8,
+    `booking_city` LowCardinality(String),
+    `booking_country` LowCardinality(String),
+    `browser` String,
+    `card_id` Int32,
+    `card_issuer` String,
+    `device` String,
+    `end_date` DateTime,
+    `event_time` DateTime,
+    `event_type` String,
+    `has_parking` UInt8,
+    `has_wifi` UInt8,
+    `os` String,
+    `price_in_usd` Float64,
+    `property_type` LowCardinality(String),
+    `start_date` DateTime,
+    `user_id` Int32,
+    `user_location` String,
+    `booking_duration` Int64
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYear(start_date)"
+ENGINE_SORTING_KEY "end_date, user_id, user_location, booking_duration"

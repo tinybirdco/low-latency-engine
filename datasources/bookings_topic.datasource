@@ -1,0 +1,31 @@
+
+SCHEMA >
+    `browser` String `json:$.browser`,
+    `card_id` Int32 `json:$.card_id`,
+    `card_issuer` String `json:$.card_issuer`,
+    `currency` String `json:$.currency`,
+    `device` String `json:$.device`,
+    `end_datetime` DateTime `json:$.end_datetime`,
+    `event_id` String `json:$.event_id`,
+    `event_time` DateTime `json:$.event_time`,
+    `event_type` String `json:$.event_type`,
+    `os` String `json:$.os`,
+    `price` Int32 `json:$.price`,
+    `product_id` Int32 `json:$.product_id`,
+    `start_datetime` DateTime `json:$.start_datetime`,
+    `user_id` Int32 `json:$.user_id`,
+    `user_location` String `json:$.user_location`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYYMM(__timestamp)"
+ENGINE_SORTING_KEY "__timestamp"
+
+KAFKA_CONNECTION_NAME 'confluent-test'
+KAFKA_TOPIC 'bookings_topic'
+KAFKA_GROUP_ID 'bookings_topic_1717659819119'
+KAFKA_AUTO_OFFSET_RESET 'latest'
+KAFKA_STORE_RAW_VALUE 'False'
+KAFKA_STORE_HEADERS 'False'
+KAFKA_STORE_BINARY_HEADERS 'True'
+KAFKA_TARGET_PARTITIONS 'auto'
+KAFKA_KEY_AVRO_DESERIALIZATION ''

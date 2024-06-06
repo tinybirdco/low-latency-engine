@@ -4,21 +4,20 @@ NODE discount_matrix
 SQL >
 
     %
-    SELECT 
-      user_id,
-      if(booking_duration >= {{Int16(months, 2)}}*30, 1, 0) as duration_value,
-      if(price_in_usd > {{Int16(usd, 300)}}, 1, 0) as price_value,
-      if(booking_country in {{Array(countries, 'String', default='FR,PT')}}, 1, 0) as countries_value,
-      if(property_type in {{Array(countries, 'String', default='house,apartment')}}, 1, 0) as property_value,
-      if(has_wifi = {{Int16(wifi_flag, 1)}}, 1, 0) as wifi_value,
-      if(has_parking = {{Int16(parking_flag, 1)}}, 1, 0) as parking_value,
-      if(are_pets_allowed = {{Int16(pets_flag, 1)}}, 1, 0) as pets_value
-    FROM
-      booking_events_mv
-    WHERE
-      event_type = 'search'
-      and event_time >= toTimezone(now(), 'Europe/Berlin') - interval 10 second
-
+        SELECT 
+          user_id,
+          if(booking_duration >= {{Int16(days, 2)}}, 1, 0) as duration_value,
+          if(price_in_usd > {{Int16(usd, 300)}}, 1, 0) as price_value,
+          if(booking_country in {{Array(countries, 'String', default='SP,PT')}}, 1, 0) as countries_value,
+          if(property_type in {{Array(countries, 'String', default='house,apartment')}}, 1, 0) as property_value,
+          if(has_wifi = {{Int16(wifi_flag, 1)}}, 1, 0) as wifi_value,
+          if(has_parking = {{Int16(parking_flag, 1)}}, 1, 0) as parking_value,
+          if(are_pets_allowed = {{Int16(pets_flag, 1)}}, 1, 0) as pets_value
+        FROM
+          bookings_mv
+        WHERE
+          event_type = 'search'
+          and event_time >= now() - interval 10 minute
 
 
 
@@ -26,15 +25,15 @@ NODE filter_by_discount_index
 SQL >
 
     %
-    WITH (
-      duration_value+price_value+countries_value+property_value+wifi_value+parking_value+pets_value
-    ) as discount_index
-    SELECT
-      user_id,
-      discount_index
-    FROM discount_matrix
-    WHERE discount_index >= {{Int16(discount, 5)}}
-    ORDER BY discount_index DESC
+        WITH (
+          duration_value+price_value+countries_value+property_value+wifi_value+parking_value+pets_value
+        ) as discount_index
+        SELECT
+          user_id,
+          discount_index
+        FROM discount_matrix
+        WHERE discount_index >= {{Int16(discount, 5)}}
+        ORDER BY discount_index DESC
 
 
 

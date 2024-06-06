@@ -1,0 +1,18 @@
+
+SCHEMA >
+    `product_id` UInt32,
+    `booking_country` LowCardinality(String),
+    `booking_city` LowCardinality(String),
+    `property_type` LowCardinality(String),
+    `are_pets_allowed` UInt8,
+    `has_wifi` UInt8,
+    `has_parking` UInt8
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "are_pets_allowed, has_wifi, has_parking"
+
+IMPORT_SERVICE 's3_iamrole'
+IMPORT_CONNECTION_NAME 'gnz-test-2-conn'
+IMPORT_BUCKET_URI 's3://gnz-test-2/demo_products.csv'
+IMPORT_STRATEGY 'append'
+IMPORT_SCHEDULE '@on-demand'
